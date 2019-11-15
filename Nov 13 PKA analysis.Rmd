@@ -1,0 +1,195 @@
+---
+title: "Nov 13 PKA analysis"
+author: "Colin Longstaff"
+date: "13/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(pander)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(nortest)
+```
+
+## PKA results analysis using new one stage method
+
+This document looks at various results to compare EP and One Stage Method
+
+First load the data and clean it up
+
+```{r, echo=FALSE}
+assayDat<-read.csv("./Data/Updated allIC_plus_samples.csv")
+assayDat$Date<-lubridate::dmy(assayDat$Date)  #make sure the dates are in the right format
+assayDat<-assayDat %>% filter(Sample !=162035, Sample !=162924) #get rid of samples that only appear once
+assayDat2<-assayDat %>% filter(Name !='CL', Name !='BF') #get rid of samples from CL and BF
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+#Scatter plots
+ggAssay<-ggplot(assayDat, aes(x=Sample, y=Value))+ 
+  aes(color=Method, size=1/(u95-l95), shape=Name)  + geom_jitter(alpha=0.5, width = 0.3)+
+  scale_color_manual(values=c("dodgerblue1", "tomato"))+ #control point colour
+  scale_shape_manual(values = c( 4, 5,6, 15,16,17))+ #control symbols, 15-18 are filled square, circle, triangle, diamond
+  theme_minimal()
+ggAssay
+```
+
+There are a few stray assays from CL and BF that make the One Stage assay have poorer performance.  What do the results look like if we take out BF and CL.
+
+Unfortunately this leaves some of the samples with only 1 One Stage result
+
+```{r, echo=FALSE}
+#Scatter plots
+ggAssay2<-ggplot(assayDat2, aes(x=Sample, y=Value))+ 
+  aes(color=Method, size=1/(u95-l95), shape=Name)  + geom_jitter(alpha=0.5, width = 0.3)+
+  scale_color_manual(values=c("dodgerblue1", "tomato"))+ #control point colour
+  scale_shape_manual(values = c( 6, 15,16,17))+ #control symbols, 15-18 are filled square, circle, triangle, diamond
+  theme_minimal()
+ggAssay2
+```
+
+This might be better presented as a boxplot.  This plot now with all the results, including BF and CL
+
+```{r, echo=FALSE}
+#Boxplots
+ggBox1<-ggplot(assayDat, aes(x=Sample, y=Value))+ 
+  aes(fill=Method)  + 
+  scale_fill_manual(values=c("dodgerblue1", "tomato"))+
+  geom_boxplot()+
+  #geom_point(group_by(Method) %>% summarise(mean(Value)))+
+  #stat_summary(fun.y = "mean", geom = "point", shape=23, size = 3, fill = "white")+
+  theme_light()
+ggBox1
+```
+
+We can summarise the actual numbers for all these samples.
+
+
+
+```{r, echo=FALSE}
+DatRes<-assayDat %>% group_by(Sample, Method) %>% summarise(Mean=mean(Value), SD=sd(Value), N=n()) 
+DatRes2<-assayDat %>% group_by(Sample) %>% summarise(sample_mean=mean(Value), N=n())
+DatRes3<-left_join(DatRes, DatRes2) %>% mutate(PC_dif=100*((Mean-sample_mean)/sample_mean))
+
+pander(DatRes)
+```
+
+From the graph and table the only results that may be different are for 163012.  Is this real?
+
+```{r, echo=FALSE}
+Val163012.ep<-assayDat %>% filter(Sample == '163012') %>% filter(Method == "EP") %>% pull(Value)
+Val163012.cl<-assayDat %>% filter(Sample == '163012') %>% filter(Method == "CL") %>% pull(Value)
+
+Ttest.163012<-t.test(Val163012.ep, Val163012.cl)
+Wtest.163012<-wilcox.test(Val163012.ep, Val163012.cl)
+#Wtest.163012[[3]]
+```
+Neither the ttest, p= `r Ttest.163012[[3]]` or the Wilcox rank sum test, p= `r Wtest.163012[[3]]` show there is a statistically significant difference between methods for 163012.  However, if there was then more data would be needed to demonstrate a difference. 
+
+
+Another potential problem is there are more readings in the EP method which may affect the analysis.  It may certainly reduce the SD for the EP data.  We could try sample the EP to chose 25 results at random and compare this set of data with the One Stage Method.
+
+```{r, echo=FALSE}
+assayDatICEP25<-assayDat %>% filter(Sample == 'IC') %>% filter(Method == 'EP') %>% sample_n(25, replace = FALSE)
+assayDatICCL25<-assayDat %>% filter(Sample == 'IC') %>% filter(Method == 'CL') %>% sample_n(25, replace = FALSE)
+assayDatResnoICEP<-assayDat %>% filter(!Sample == 'IC' )
+assayDat4<-data.frame(rbind(assayDatICEP25, assayDatICCL25, assayDatResnoICEP))
+
+DatRes4<-assayDat4 %>% group_by(Sample, Method) %>% summarise(Mean=mean(Value), SD=sd(Value), N=n()) 
+
+pander(DatRes4)
+
+```
+
+The means don't change but this still looks like the EP method has a better SD than the One Stage Method
+
+
+The table below suggests that the CL method may be reading a bit lower than the EP method (the percent difference from the mean is negative for the One Stage Method).  The exception is the IC, which has the most data, so can't be sure.
+
+
+```{r, echo=FALSE}
+DatRes<-assayDat %>% group_by(Method, Sample) %>% summarise(Median=median(Value), Mean=mean(Value), SD=sd(Value)) 
+DatRes2<-assayDat %>% group_by(Sample) %>% summarise(sample_mean=mean(Value))
+DatRes3<-left_join(DatRes, DatRes2) %>% mutate(PC_dif=100*((Mean-sample_mean)/sample_mean))
+
+pander(DatRes3)
+```
+
+To summarise the differences between the two methods.
+
+
+```{r, echo=FALSE}
+DatRes3.summ<-DatRes3 %>% group_by(Method) %>% summarise(mean(PC_dif)) 
+pander(DatRes3.summ)
+```
+Overall The differences between the two methods are tiny for CL and EP methods, `r DatRes3.summ[[2]]`%, respectively.
+
+### Are the distribution of results equivalent for the two methods with IC
+
+We can do some more analysis on the IC results
+
+```{r, echo=FALSE}
+ValIC.ep<-assayDat4 %>% filter(Sample == 'IC') %>% filter(Method == "EP") %>% pull(Value)
+ValIC.cl<-assayDat4 %>% filter(Sample == 'IC') %>% filter(Method == "CL") %>% pull(Value)
+
+Wil.EPCL<-wilcox.test(ValIC.ep, ValIC.cl)
+
+Sh.CL<-shapiro.test(ValIC.cl)
+Sh.EP<-shapiro.test(ValIC.ep)
+
+AD.CL<-ad.test(ValIC.cl)
+AD.EP<-ad.test(ValIC.ep)
+
+VT.CL.EP<-var.test(ValIC.cl,ValIC.ep)
+KS.CL.EP<-ks.test(ValIC.cl,ValIC.ep )
+#KS.EP<-ks.test(ValIC.ep)
+
+Tt.EPCL<-t.test(ValIC.ep, ValIC.cl)
+#pander(Tt.EPCL[[5]])
+pander(Wil.EPCL)
+```
+
+The Wilcox test suggests that the two distributions of results for IC using EP or Once stage methods are not significantly different, p= `r Wil.EPCL[[3]]`, as does the Kolmogorov Smirnov test, p= `r KS.CL.EP[[2]]`
+
+However, the variances for the two methods are different, p = `r VT.CL.EP[[3]]` and the results do not seem to be normally distributed.  The Shaprio Wilk test for the EP and One Stage Methods, respectively, give p values of, `r Sh.EP[[2]]` and `r Sh.CL[[2]]`.  
+
+Nevertheless the t.test resuls show that the mean values of the IC for each method is `r Tt.EPCL[[5]]` and the p value that the difference could be obtained by chance is `r Tt.EPCL[[7]]`, suggest the difference is not significant.
+
+Strictly speaking the results are not normally distributed, but the means and medians are all very close. Overall the results are not really different, whichever way you look at it.
+
+Can also be plotted in a histogram form
+
+```{r, echo = FALSE}
+#need to change colours
+
+allIC<-assayDat  %>% filter(Sample=='IC') #use assayDat4 for equivalent n
+meanIC.CL<-mean(ValIC.cl)
+meanIC.EP<-mean(ValIC.ep)
+
+gghis<-ggplot(allIC, aes(x=Value , fill= Method))+
+  scale_fill_manual(values=c("dodgerblue1", "tomato"))+
+  geom_histogram(position="identity", alpha=0.4, binwidth = 0.1)+
+  geom_vline(xintercept = meanIC.CL, col="blue", lty=2, lwd=1)+geom_vline(xintercept = meanIC.EP, col="red", lty=2, lwd=1)+
+  theme_minimal()
+gghis
+```
+
+Could perhaps do with a few more results, especially if we drop CL data.
+
+
+
+
+
+
+
+
+
+
+
