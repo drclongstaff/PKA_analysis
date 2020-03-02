@@ -1,0 +1,157 @@
+---
+title: "PKA_CL"
+output:
+  pdf_document: default
+  html_document: default
+---
+# Notes for calculating rates of prekallikrein activator activity in albumin or immunoglobulins using a chromogenic substrate
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+#setwd("C:/Users/clongsta/OneDrive - MHRA/Shiny/PKA/PKA_CL_2019")
+```
+The app is available online [here](https://drclongstaff.shinyapps.io/PKA_CL)
+
+# Background
+
+The assay to be analysed is the single step prekallikrein acitivity assay method developed by Longstaff et al.  The method is designed to measure prekallikrein activator (PKA) activity in clinical products of albumin or immunoglobulins.  The aim of the method is to measure kallikrein generation in a single step reaction containing.  The reaction mixture contains all the components needed to measure PKA activity in a single step:
+
+* PKA __standard or test solution__ 
+* plus __PKA substrate (PKS)__ made from plasma 
+* plus __chromogenic substrate__ that is hydrolysed by the generated kallikrein. 
+
+The rate of kallikrein generation is proportional to the slope of the plot of __absorbance__ versus __time squared__
+
+Reactions take place in a 96 well plate and will include multiple doses of standard and test samples in a symmetrical arrangement so that half the plate includes the PKS and the other half does not. Where PKS is not present, pre-existing kallikrein is measured and this background level is subtracted from the PKA activity which measures kallikrein generated during the assay. Only PKA activity is important, not pre-exisiting kallkrein.
+
+A help tab in the app summarises the main features of PKA activity version 0.5 and above.  More details are presented below.
+
+# The *Plots* tab
+
+### Data Entry
+
+A set of data is provided and is automatically read and analysed when the program starts.  The substrate hydrolysis curves generated can be explored to get a feel for using the various options discussed below.  However, the main use for the app is to facilitate analysis of user data.
+
+Time course data, exported from a plate reader for example, should be formated as a single column of time in column 1 followed by 96 columns of absorbance data.   Data can be read as csv or txt files, and these options are specified using the check boxes in the left hand panel.  It is also necessary to specify if the columns have header text ("Time", well names "A1", "A2"... etc).  
+
+__Note:__ *it is important not to leave empty cells in the data file, incomplete columns or rows, or spaces in names of column headers in any data files.  Gaps and spaces are the main reasons the program fails to read data or complete an analysis.*
+
+Below is an example of a few rows of data to show how it should be formatted (and how it should appear in the *Raw data* tab).  
+
+\pagebreak
+
+```{r}
+#Data read from a text file with columns labelled Free and Bound (saved from your Excel spreadsheet for example)
+#Res<-read.csv("GR Example T_B.csv", header=TRUE)
+Res<-read.csv("PKA070918CL.csv", header=TRUE)
+#Cols<-c(1, 20, 21, 22, 23, 26, 27, 28, 29, 30)
+#Res1<-Res[1:10, c(1, 38:42) ]
+Res1<-Res[1:10, 1:9]
+library(pander)
+pander(Res1, row.names=FALSE) #Shows what's in the data table, top few points
+```
+
+
+### Plotting and analysing the data
+
+The graphical output in the main panel of the opening page is organised by number of rows specified, using the *Number of rows * numerical input box, which should usually be left at 8 for a standard 96 well plate.  The *Data in 'curve' tab* input selects the individual plot and fit that can be scrutinised in the second tab labelled *Curve* (see below).
+
+Plots and calculated results are modified by *Number of points* and *Maximum absorbance* inputs. An option is included to add a *Time delay*, which is the time between initiating your reaction and taking the first reading (if this is not already present in the data file).  The time delay does not affect calculation of slopes where _time_ is used as the independent variable; but it does affect calculations when _time squared_ is used.
+
+
+The next set of options are self-explanatory: The *Use time squared* checkbox is used to toggle between time or time squared on the x-axis. In either case a line of best fit through the data points is generated. If this checkbox is unchecked, the app can be used to simply calculate rates for any chromogenic substrate hydrolysis and is appropriate for kallikrein activity-in those wells without PKS.  Time squared rates (the output is in Abs/s ^2^ x 10^9^) is appropriate for determining activity of PKA (i.e. the generation of kallikrein). 
+
+*Zero at t0*, subtracts the initial absorbance reading from all the data in each well.  The *show what* radio buttons provides an option to display calculated rates (time or time squared depending on the checkbox selection), well names or well numbers in the graphical output.  
+
+```{r}
+knitr::include_graphics("UL2.png")
+```
+
+# Subtraction of blanks
+
+### Kallikrein in the PKS 
+
+There are two types of blank correction available: i) subtraction of kallikrein activity that is present in the PKS; and ii) subtraction of kallikrein activity in the samples (before PKA has worked). 
+
+i)  Can be applied by including a well on the plate that has PKS and chromogenic subtrate, but no sample.  The chosen well is identifed as the well number on the plate.  Leaving a value of 0 in this box mean no subtraction.
+
+ii) If you know the rate to expect from your batch of substrate, you can enter this in the second box.  The units are in 10^6^ x absorbance units per second. Again, 0 in this box means no subtraction.
+
+These corrections are not essential when using a standard to measure relative potencies because where PKS is present it is at the same concentration in standard and test wells.  However, correct blanking may improve linearity of the plots.
+
+It may take the plate a while to stabilise in the reader and an option is provided to drop some initial readings.  It is worth exploring if these early points are linear or not in the absorbance versus time squared plots.
+
+The PKS settings panel may look like this 
+```{r}
+knitr::include_graphics("LM2.png")
+```
+
+#### Kallikrein in the samples
+
+It is usual for the assay to be setup to include a set of standard and test samples with PKS and a parallel set without PKS.  The part of the plate without PKS is subtracted from the part with PKS.  In this way, pre-exisiting kallikrein activity is subtracted from the activity of PKA which generates new kallikrein.  Absorbance values at each time point with PKS are subtracted from corresponding wells without PKS to calculate the corrected rate of PKA activity for each well.  
+
+Options are provided for different plate arrangements to subtract the half of the plate without PKA from the wells with PKS.  So, for example, *top - bottom* will subtract absorbance values in column E1-E12 from from A1-A12, etc, leading to A1-E1, B1-F1, C1-G1, D1-H1, A2-E2.... across the plate. The other options shown replicate this process for *bottom - top*, *left - right* and *right - left*. 
+
+In this section of settings you can also limit the areas to be subtracted, for example starting the *subtraction block top start* at 13 removes the top and symmetrical bottom rows of wells.  The active blocks are 13-48 and 49-84.  The outer rows may be used to hold PKS for dispensing, for example. The left and right blocks can be manipulated in a similar way so as not to use outer columns for readings.
+
+Arrangement for subtracting no PKS wells (in this case eliminating top and bottom rows)
+```{r}
+knitr::include_graphics("LL1.png")
+```
+
+### Results Outputs
+
+Plots and tables generated can be copied to the clipboard by highlighting and right-clicking using the mouse. If you download and run the ui.R and server.R files locally in RStudio, you can search for the line of code in the Results Table section of the server.R file that contains "clipboard" and remove the # from the beginning of the line.  If this line of code is active, the contents of the table are automatically placed in the clipboard and can be pasted directly elsewhere for further analysis.  This app only prepares data for calculation of relative potencies, it does not calculate them (another program such as Combistats is used).
+
+The graphical output should look something like this.  In this case the PKA is measure in the top half of the plate (no PKS in the bottom half) and the two outer rows are ignored.
+
+```{r, out.width = "400px"}
+knitr::include_graphics("Plate graphics 2.png")
+```
+
+## Results table
+
+The results table corresponds to the graphical layout and displays the results in **Abs/s** or **Abs/s^2^** if the *Use time squared* box is ticked.  The rates are multiplied by 10^6^ (1e6) or 10^9^ (1e9), respectively to make them easy to read in the table.  For calculation of PKA activity, the time squared rates should be used.  Recall that if a plate subtraction is selected to correct for background kallikrein, this is performed on raw data, point by point, so there is no need to subtract calcaulated rates.
+
+```{r}
+knitr::include_graphics("Plate table 2.png")
+```
+
+A table of settings is also generated to record how parameters in the left panel were set. This is helpful for reproducibility and quality control purposes and may be copied and pasted into other documents. 
+
+```{r}
+knitr::include_graphics("Plate settings 2.png")
+```
+
+
+# The *Curve* tab
+
+The curve tab allows the user to focus on a single curve, which is selected from the box labelled *Data in 'Curve' tab*.  
+
+By default the plot shown is Absorbance versus time squared, and includes all the points in the dataset.  Number of points and maximum absorbance should be used to optimise plot linearity to calculate the slope and hence rate of reaction. The calculated value of rate is shown as a figure heading.  There is also an option to select a plot of resdiduals  to check for systematic deviations between the data points and the linear regression.  In this case the results also show the adjusted R-squared value as a measure of the goodness of fit.  
+
+```{r, out.width = "400px"}
+knitr::include_graphics("Curve graph 1.png")
+```
+
+
+# The *Raw data* tab
+
+On this tab the name of the data file loaded is shown alongside the raw data as a table for inspection.  It is possible to click through pages of data using boxes at the foot of the page and to show data from start to end or in reverse.
+
+# The *Help* tab
+
+The *Help* tab summarises these help notes and provides citation details.
+
+R code, data and help files are available from:
+https://github.com/drclongstaff/
+
+More information and links may be found at 
+http://www.nibsc.org/science_and_research/biotherapeutics/haemostasis/fibrinolysis.aspx
+
+# References
+1. Ranby M. Studies on the kinetics of plasminogen activation by tissue plasminogen activator.  *Biochim Biophys Acta*, 704(3), 461-9, 1982
+2. Longstaff C et al, Kinetics of plasmin activation of single chain urinary-type plasminogen activator (scu-uPA) and demonstration of a high affinity interaction between scu-PA and plasminogen, *J Biol Chem*, 267(1), 173-9, 1992
+3. Longstaff C et al, A comparison of cultured cells with other promoters of tissue plasminogen activator kinetics, *Fibrinolysis*, 9, 178-87, 1995
+4. Longstaff C. Development of Shiny app tools to simplify and standardize the analysis of hemostasis data.
+*Journal of Thrombosis and Haemostasis*, 15, 1-3, 2017
